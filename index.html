@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modelador de Siembra — UTM</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2230;
+  --border: #2d3a4a;
+  --accent: #3fb950;
+  --accent2: #58a6ff;
+  --accent3: #f78166;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --text3: #30363d;
+  --mono: 'Share Tech Mono', monospace;
+  --head: 'Barlow Condensed', sans-serif;
+  --body: 'Barlow', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* === HEADER === */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 56px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.logo span { color: var(--text2); font-weight: 300; }
+
+.header-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  margin-left: auto;
+  letter-spacing: 1px;
+}
+
+/* === LAYOUT === */
+.app {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  min-height: calc(100vh - 56px);
+}
+
+/* === SIDEBAR === */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* --- Sección de ingreso principal --- */
+.input-section {
+  padding: 20px 20px 0;
+}
+
+/* --- Grupo título de sección --- */
+.section-label {
+  font-family: var(--head);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--text2);
+  text-transform: uppercase;
+  padding: 18px 0 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.section-label:first-child { padding-top: 0; }
+
+/* --- Campo principal de ingreso --- */
+.input-primary {
+  margin-bottom: 14px;
+}
+
+.input-primary label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.input-primary label .unit {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text2);
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+
+.input-primary input,
+.input-primary select {
+  width: 100%;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 400;
+  padding: 10px 14px;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  letter-spacing: 1px;
+}
+
+.input-primary select {
+  font-size: 13px;
+}
+
+.input-primary input::placeholder { color: var(--text3); }
+
+.input-primary input:focus,
+.input-primary select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(63,185,80,.12);
+}
+
+.input-primary input:not(:placeholder-shown):not(:focus) {
+  border-color: rgba(63,185,80,.4);
+}
+
+/* --- Fila de dos campos primarios --- */
+.input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* --- Chip de valor calculado (Dc, Beta) --- */
+.calc-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(88,166,255,.06);
+  border: 1px solid rgba(88,166,255,.18);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-top: -6px;
+  margin-bottom: 14px;
+}
+
+.calc-chip .cc-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.calc-chip .cc-formula {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(88,166,255,.6);
+  flex-shrink: 0;
+}
+
+.calc-chip .cc-value {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--accent2);
+  margin-left: auto;
+  letter-spacing: 1px;
+}
+
+/* hidden input para el motor de cálculo */
+.hidden-calc { display: none; }
+
+/* --- Botones --- */
+.btn-actions {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.btn-calc {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  color: #0d1117;
+  border: none;
+  border-radius: 5px;
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+}
+
+.btn-calc:hover { background: #56d364; }
+.btn-calc:active { transform: scale(.98); }
+
+.btn-ejemplo {
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+
+.btn-ejemplo:hover {
+  background: rgba(88,166,255,.08);
+  color: var(--accent2);
+  border-color: rgba(88,166,255,.4);
+}
+
+/* --- Stats post-cálculo --- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 20px 20px;
+}
+
+.stat-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px 12px;
+}
+
+.stat-box .sv {
+  font-family: var(--mono);
+  font-size: 20px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.stat-box .sl {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+/* utm info */
+.utm-info {
+  background: rgba(88,166,255,.05);
+  border: 1px solid rgba(88,166,255,.15);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(88,166,255,.6);
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+
+/* === MAIN === */
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* === TOOLBAR === */
+.toolbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-tabs {
+  display: flex;
+  gap: 2px;
+  margin-right: 12px;
+}
+
+.tab-btn {
+  padding: 5px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text2);
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all .15s;
+}
+
+.tab-btn.active {
+  background: var(--surface2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.tab-btn:hover:not(.active) { color: var(--text); }
+
+.export-btn {
+  padding: 5px 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--head);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.export-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.export-btn.xls:hover { border-color: #3fb950; color: #3fb950; }
+.export-btn.pdf:hover { border-color: var(--accent3); color: var(--accent3); }
+.export-btn.kml:hover { border-color: #d2a679; color: #d2a679; }
+
+.icon { font-size: 13px; }
+
+.ml-auto { margin-left: auto; }
+
+/* === CONTENT PANELS === */
+.panel { display: none; flex: 1; overflow: hidden; }
+.panel.active { display: flex; flex-direction: column; }
+
+/* === TABLE === */
+.table-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+thead th {
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  text-align: right;
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+thead th:first-child, thead th:nth-child(2) { text-align: center; }
+
+tbody tr { transition: background .1s; }
+tbody tr:hover { background: rgba(88,166,255,.04); }
+
+tbody td {
+  padding: 6px 12px;
+  text-align: right;
+  border-bottom: 1px solid rgba(45,58,74,.5);
+  color: var(--text);
+}
+
+tbody td:first-child, tbody td:nth-child(2) { text-align: center; }
+
+tbody td:first-child { color: var(--accent); font-weight: 400; }
+tbody td:nth-child(2) { color: var(--text2); }
+
+tbody tr:nth-child(even) { background: rgba(28,34,48,.4); }
+
+.surco-badge {
+  display: inline-block;
+  background: rgba(63,185,80,.15);
+  color: var(--accent);
+  border: 1px solid rgba(63,185,80,.3);
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+/* === CHART === */
+.chart-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  overflow: hidden;
+}
+
+.chart-wrap {
+  flex: 1;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden;
+  min-height: 400px;
+}
+
+#plotCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.chart-controls label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.chart-controls input[type=range] { width: 80px; }
+.chart-controls input[type=checkbox] { accent-color: var(--accent); }
+
+/* === EMPTY === */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text3);
+}
+
+.empty-state .big { font-size: 48px; }
+.empty-state p { font-family: var(--head); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+
+/* === TOAST === */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  display: none;
+  z-index: 999;
+  animation: slideIn .2s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Agro<span>UTM</span></div>
+  <div style="font-family:var(--head);font-size:13px;color:var(--text2);letter-spacing:1px;">Modelador de Siembra en Coordenadas UTM</div>
+  <div class="header-meta">v2.0 · COLOMBIA · WGS84</div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="input-section">
+      <div class="section-label">Espaciamiento</div>
+
+      <!-- Dp: input primario grande -->
+      <div class="input-primary">
+        <label>Dp — Dist. entre Plantas <span class="unit">metros</span></label>
+        <input type="number" id="dp" value="" placeholder="0" step="0.001" min="0.1" oninput="autoDc()">
+      </div>
+      <!-- Dc: chip calculado -->
+      <div class="calc-chip">
+        <span class="cc-label">Dc</span>
+        <span class="cc-formula">= Dp × 0.866</span>
+        <span class="cc-value" id="dcDisplay">—</span>
+        <input type="hidden" id="dc" value="0">
+      </div>
+
+      <!-- Rumbo: input primario grande -->
+      <div class="input-primary">
+        <label>Rumbo α <span class="unit">grados 0–360</span></label>
+        <input type="number" id="rumbo" value="" placeholder="0" step="1" min="0" max="360" oninput="autoBeta()">
+      </div>
+      <!-- Beta: chip calculado -->
+      <div class="calc-chip">
+        <span class="cc-label">Beta β</span>
+        <span class="cc-formula">= α + 90°</span>
+        <span class="cc-value" id="betaDisplay">—</span>
+        <input type="hidden" id="beta" value="0">
+      </div>
+
+      <div class="section-label">Distribución</div>
+
+      <div class="input-row">
+        <div class="input-primary">
+          <label>N° Surcos <span class="unit">filas</span></label>
+          <input type="number" id="nSurcos" value="" placeholder="0" step="1" min="1" max="500">
+        </div>
+        <div class="input-primary">
+          <label>Plantas/Surco <span class="unit">por fila</span></label>
+          <input type="number" id="nPlantas" value="" placeholder="0" step="1" min="1" max="500">
+        </div>
+      </div>
+
+      <div class="section-label">Coordenada de Amarre (UTM)</div>
+
+      <div class="input-primary">
+        <label>X₀ — Este <span class="unit">m UTM</span></label>
+        <input type="number" id="x0" value="" placeholder="0" step="0.001">
+      </div>
+      <div class="input-primary">
+        <label>Y₀ — Norte <span class="unit">m UTM</span></label>
+        <input type="number" id="y0" value="" placeholder="0" step="0.001">
+      </div>
+
+      <div class="section-label">Configuración</div>
+
+      <div class="input-primary">
+        <label>Zona UTM</label>
+        <select id="utmZone">
+          <option value="17N">17N — Oeste Colombia</option>
+          <option value="18N" selected>18N — Centro Colombia</option>
+          <option value="19N">19N — Este Colombia</option>
+          <option value="17S">17S — Sur</option>
+          <option value="18S">18S — Sur</option>
+        </select>
+      </div>
+
+      <div class="input-primary">
+        <label>Cultivo <span class="unit">nombre</span></label>
+        <input type="text" id="cropName" value="" placeholder="Ej: Café, Palma, Banano…">
+      </div>
+
+      <div class="utm-info">
+        ℹ Ingrese coordenadas UTM reales para exportar KML válido.
+      </div>
+    </div>
+
+    <div class="btn-actions">
+      <button class="btn-calc" onclick="calcular()">▶ CALCULAR SIEMBRA</button>
+      <button class="btn-ejemplo" onclick="cargarEjemplo()">⚡ Cargar datos de ejemplo</button>
+    </div>
+
+    <div class="stats-grid" id="statsGrid" style="display:none">
+      <div class="stat-box"><div class="sv" id="statTotal">—</div><div class="sl">Total plantas</div></div>
+      <div class="stat-box"><div class="sv" id="statSurcos">—</div><div class="sl">Surcos</div></div>
+      <div class="stat-box"><div class="sv" id="statArea">—</div><div class="sl">Área aprox. m²</div></div>
+      <div class="stat-box"><div class="sv" id="statPatron">—</div><div class="sl">Patrón</div></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+    <div class="toolbar">
+      <div class="toolbar-tabs">
+        <button class="tab-btn active" onclick="setTab('tabla',this)">Tabla</button>
+        <button class="tab-btn" onclick="setTab('grafica',this)">Gráfica</button>
+      </div>
+
+      <button class="export-btn xls" onclick="exportExcel()">
+        <span class="icon">⬇</span> Excel
+      </button>
+      <button class="export-btn pdf" onclick="exportPDF()">
+        <span class="icon">⬇</span> PDF
+      </button>
+      <button class="export-btn kml" onclick="exportKML()">
+        <span class="icon">⬇</span> KML
+      </button>
+
+      <div class="ml-auto" style="font-family:var(--mono);font-size:10px;color:var(--text3);" id="toolbarInfo">
+        Sin datos · Calcule primero
+      </div>
+    </div>
+
+    <!-- TABLA PANEL -->
+    <div class="panel active" id="panel-tabla">
+      <div class="table-wrap" id="tableWrap">
+        <div class="empty-state">
+          <div class="big">🌱</div>
+          <p>Configure los parámetros y calcule</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRAFICA PANEL -->
+    <div class="panel" id="panel-grafica">
+      <div class="chart-panel">
+        <div class="chart-controls">
+          <label>
+            <input type="checkbox" id="chkLabels" checked onchange="redrawChart()"> Etiquetas
+          </label>
+          <label>
+            <input type="checkbox" id="chkGrid" checked onchange="redrawChart()"> Cuadrícula
+          </label>
+          <label>
+            <input type="checkbox" id="chkLines" checked onchange="redrawChart()"> Líneas surco
+          </label>
+          <label>Zoom: <input type="range" id="zoomRange" min="0.3" max="5" step="0.1" value="1" oninput="redrawChart()"></label>
+          <button class="export-btn" onclick="exportChartPNG()">⬇ PNG</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="plotCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  AUTO-CÁLCULO: Dc = Dp × 0.866 | Beta = Rumbo + 90
+// ============================================================
+function autoDc() {
+  const dp = parseFloat(document.getElementById('dp').value);
+  if (!isNaN(dp) && dp > 0) {
+    const dc = (dp * 0.866).toFixed(3);
+    document.getElementById('dc').value     = dc;
+    document.getElementById('dcDisplay').textContent = dc + ' m';
+  } else {
+    document.getElementById('dc').value     = 0;
+    document.getElementById('dcDisplay').textContent = '—';
+  }
+}
+
+function autoBeta() {
+  const rumbo = parseFloat(document.getElementById('rumbo').value);
+  if (!isNaN(rumbo)) {
+    const beta = ((rumbo + 90) % 360).toFixed(0);
+    document.getElementById('beta').value       = beta;
+    document.getElementById('betaDisplay').textContent = beta + '°';
+  } else {
+    document.getElementById('beta').value       = 0;
+    document.getElementById('betaDisplay').textContent = '—';
+  }
+}
+
+// ============================================================
+//  CARGAR EJEMPLO
+// ============================================================
+function cargarEjemplo() {
+  document.getElementById('dp').value       = 9;
+  document.getElementById('dc').value       = (9 * 0.866).toFixed(3);
+  document.getElementById('dcDisplay').textContent  = (9 * 0.866).toFixed(3) + ' m';
+  document.getElementById('rumbo').value    = 307;
+  document.getElementById('beta').value     = (307 + 90) % 360;
+  document.getElementById('betaDisplay').textContent = ((307 + 90) % 360) + '°';
+  document.getElementById('nPlantas').value  = 29;
+  document.getElementById('nSurcos').value   = 16;
+  document.getElementById('x0').value       = 595594;
+  document.getElementById('y0').value       = 1186157;
+  document.getElementById('cropName').value  = 'Café';
+  showToast('✓ Datos de ejemplo cargados — pulse CALCULAR');
+}
+
+// ============================================================
+//  STATE
+// ============================================================
+let puntos = [];
+let params = {};
+
+// ============================================================
+//  FORMULAS (traducción de Excel)
+// ============================================================
+function calcular() {
+  const dp     = parseFloat(document.getElementById('dp').value);
+  const dc     = parseFloat(document.getElementById('dc').value);
+  const rumbo  = parseFloat(document.getElementById('rumbo').value);
+  const beta   = parseFloat(document.getElementById('beta').value);
+  const nS     = parseInt(document.getElementById('nSurcos').value);
+  const nP     = parseInt(document.getElementById('nPlantas').value);
+  const x0     = parseFloat(document.getElementById('x0').value);
+  const y0     = parseFloat(document.getElementById('y0').value);
+
+  const rRad = rumbo * Math.PI / 180;
+  const bRad = beta  * Math.PI / 180;
+
+  params = { dp, dc, rumbo, beta, nS, nP, x0, y0, rRad, bRad };
+
+  puntos = [];
+
+  // Surco 0 (base desde coordenada de amarre)
+  for (let p = 1; p <= nP; p++) {
+    let x, y;
+    if (p === 1) {
+      x = x0;
+      y = y0;
+    } else {
+      const prev = puntos[puntos.length - 1];
+      x = prev.x + dp * Math.sin(rRad);
+      y = prev.y + dp * Math.cos(rRad);
+    }
+    puntos.push({ surco: 0, planta: p, x, y });
+  }
+
+  // Surcos 1..nS
+  for (let s = 1; s <= nS; s++) {
+    const isOdd = s % 2 !== 0;
+    for (let p = 1; p <= nP; p++) {
+      let x, y;
+      if (p === 1) {
+        if (isOdd) {
+          x = x0 + s * dc * Math.sin(bRad) + 0.5 * dp * Math.sin(rRad);
+          y = y0 + s * dc * Math.cos(bRad) + 0.5 * dp * Math.cos(rRad);
+        } else {
+          x = x0 + s * dc * Math.sin(bRad);
+          y = y0 + s * dc * Math.cos(bRad);
+        }
+      } else {
+        const prev = puntos[puntos.length - 1];
+        x = prev.x + dp * Math.sin(rRad);
+        y = prev.y + dp * Math.cos(rRad);
+      }
+      puntos.push({ surco: s, planta: p, x, y });
+    }
+  }
+
+  renderTable();
+  redrawChart();
+  updateStats();
+  showToast(`✓ ${puntos.length} plantas calculadas en ${nS+1} surcos`);
+}
+
+// ============================================================
+//  STATS
+// ============================================================
+function updateStats() {
+  const { nS, nP, dp, dc } = params;
+  const total = (nS + 1) * nP;
+  const area  = Math.round(nP * dp * nS * dc);
+  document.getElementById('statTotal').textContent  = total;
+  document.getElementById('statSurcos').textContent = nS + 1;
+  document.getElementById('statArea').textContent   = area.toLocaleString();
+  document.getElementById('statPatron').textContent = 'TRESB.';
+  document.getElementById('statsGrid').style.display = 'grid';
+  document.getElementById('toolbarInfo').textContent =
+    `${total} plantas · ${nS+1} surcos · Rumbo ${params.rumbo}°`;
+}
+
+// ============================================================
+//  TABLE RENDER
+// ============================================================
+function renderTable() {
+  const wrap = document.getElementById('tableWrap');
+  if (!puntos.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="big">🌱</div><p>Sin datos</p></div>';
+    return;
+  }
+
+  let rows = puntos.map(p =>
+    `<tr>
+      <td><span class="surco-badge">${p.surco}</span></td>
+      <td>${p.planta}</td>
+      <td>${p.x.toFixed(6)}</td>
+      <td>${p.y.toFixed(6)}</td>
+    </tr>`
+  ).join('');
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Surco</th>
+          <th>Planta</th>
+          <th>X (Este)</th>
+          <th>Y (Norte)</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ============================================================
+//  CHART RENDER
+// ============================================================
+function redrawChart() {
+  const canvas = document.getElementById('plotCanvas');
+  const wrap   = canvas.parentElement;
+  canvas.width  = wrap.clientWidth  || 800;
+  canvas.height = wrap.clientHeight || 500;
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!puntos.length) {
+    ctx.fillStyle = '#30363d';
+    ctx.font = '14px "Share Tech Mono"';
+    ctx.textAlign = 'center';
+    ctx.fillText('SIN DATOS — Calcule primero', canvas.width/2, canvas.height/2);
+    return;
+  }
+
+  const showGrid   = document.getElementById('chkGrid').checked;
+  const showLabels = document.getElementById('chkLabels').checked;
+  const showLines  = document.getElementById('chkLines').checked;
+  const zoom       = parseFloat(document.getElementById('zoomRange').value);
+
+  // Bounds
+  const xs = puntos.map(p => p.x), ys = puntos.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  const margin = 60;
+  const W = canvas.width  - margin * 2;
+  const H = canvas.height - margin * 2;
+  const scaleX = W / ((maxX - minX) || 1) * zoom;
+  const scaleY = H / ((maxY - minY) || 1) * zoom;
+  const scale  = Math.min(scaleX, scaleY);
+
+  const cx = (x) => margin + (x - minX) * scale + (W - (maxX - minX) * scale) / 2;
+  const cy = (y) => canvas.height - margin - (y - minY) * scale - (H - (maxY - minY) * scale) / 2;
+
+  // Background
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  if (showGrid) {
+    ctx.strokeStyle = '#1c2230';
+    ctx.lineWidth = 1;
+    const step = Math.pow(10, Math.floor(Math.log10((maxX - minX) || 1)));
+    for (let gx = Math.floor(minX/step)*step; gx <= maxX + step; gx += step) {
+      ctx.beginPath(); ctx.moveTo(cx(gx), margin); ctx.lineTo(cx(gx), canvas.height - margin); ctx.stroke();
+    }
+    for (let gy = Math.floor(minY/step)*step; gy <= maxY + step; gy += step) {
+      ctx.beginPath(); ctx.moveTo(margin, cy(gy)); ctx.lineTo(canvas.width - margin, cy(gy)); ctx.stroke();
+    }
+  }
+
+  // Axes labels
+  ctx.fillStyle = '#30363d';
+  ctx.font = '10px "Share Tech Mono"';
+  ctx.textAlign = 'center';
+  ctx.fillText(`X: ${minX.toFixed(1)}`, cx(minX), canvas.height - 8);
+  ctx.fillText(`X: ${maxX.toFixed(1)}`, cx(maxX), canvas.height - 8);
+  ctx.save(); ctx.translate(14, cy(minY + (maxY-minY)/2)); ctx.rotate(-Math.PI/2);
+  ctx.fillText(`Y: ${minY.toFixed(1)}—${maxY.toFixed(1)}`, 0, 0); ctx.restore();
+
+  // Color palette per surco
+  const nSurcos = Math.max(...puntos.map(p => p.surco)) + 1;
+  const getColor = (s) => {
+    const hue = (s / nSurcos) * 300;
+    return `hsl(${hue},70%,60%)`;
+  };
+
+  // Lines per surco
+  if (showLines) {
+    for (let s = 0; s <= nSurcos - 1; s++) {
+      const sp = puntos.filter(p => p.surco === s);
+      if (sp.length < 2) continue;
+      ctx.beginPath();
+      ctx.strokeStyle = getColor(s) + '55';
+      ctx.lineWidth = 1;
+      sp.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(cx(p.x), cy(p.y));
+        else ctx.lineTo(cx(p.x), cy(p.y));
+      });
+      ctx.stroke();
+    }
+  }
+
+  // Points
+  const dotR = Math.max(2, Math.min(6, scale * params.dp * 0.15));
+  puntos.forEach(p => {
+    const color = getColor(p.surco);
+    ctx.beginPath();
+    ctx.arc(cx(p.x), cy(p.y), dotR, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    if (showLabels && dotR > 3) {
+      ctx.fillStyle = color + 'aa';
+      ctx.font = `${Math.max(8, dotR)}px "Share Tech Mono"`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`${p.surco}-${p.planta}`, cx(p.x) + dotR + 2, cy(p.y) - 2);
+    }
+  });
+
+  // Anchor point
+  ctx.beginPath();
+  ctx.arc(cx(params.x0), cy(params.y0), 6, 0, Math.PI * 2);
+  ctx.strokeStyle = '#f78166';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(247,129,102,.3)';
+  ctx.fill();
+  ctx.fillStyle = '#f78166';
+  ctx.font = '10px "Share Tech Mono"';
+  ctx.textAlign = 'left';
+  ctx.fillText('AMARRE', cx(params.x0) + 9, cy(params.y0) - 4);
+
+  // Legend
+  ctx.font = '9px "Share Tech Mono"';
+  ctx.textAlign = 'left';
+  for (let s = 0; s <= Math.min(nSurcos - 1, 10); s++) {
+    ctx.fillStyle = getColor(s);
+    ctx.fillRect(canvas.width - margin - 5, margin + s * 14, 8, 8);
+    ctx.fillStyle = '#8b949e';
+    ctx.fillText(`S${s}`, canvas.width - margin + 6, margin + s * 14 + 8);
+  }
+}
+
+// ============================================================
+//  EXPORT EXCEL
+// ============================================================
+function exportExcel() {
+  if (!puntos.length) { showToast('⚠ Calcule primero'); return; }
+
+  const { dp, dc, rumbo, beta, nS, nP, x0, y0 } = params;
+
+  // Hoja de parámetros
+  const paramsWS = XLSX.utils.aoa_to_sheet([
+    ['Parámetro', 'Valor', 'Unidad'],
+    ['Dp - Distancia entre plantas', dp, 'm'],
+    ['Dc - Distancia entre surcos', dc, 'm'],
+    ['Rumbo (α)', rumbo, '°'],
+    ['Beta (β)', beta, '°'],
+    ['Número de surcos', nS, ''],
+    ['Plantas por surco', nP, ''],
+    ['Coordenada X₀ (Este)', x0, 'm UTM'],
+    ['Coordenada Y₀ (Norte)', y0, 'm UTM'],
+    ['Total plantas', puntos.length, ''],
+  ]);
+
+  // Hoja de coordenadas
+  const header = [['N°', 'Surco', 'Planta', 'X (Este)', 'Y (Norte)']];
+  const dataRows = puntos.map((p, i) => [i+1, p.surco, p.planta, p.x, p.y]);
+  const dataWS = XLSX.utils.aoa_to_sheet([...header, ...dataRows]);
+
+  // Estilos de columna
+  dataWS['!cols'] = [
+    {wch:6},{wch:8},{wch:8},{wch:18},{wch:18}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, paramsWS, 'Parámetros');
+  XLSX.utils.book_append_sheet(wb, dataWS,   'Coordenadas');
+
+  XLSX.writeFile(wb, `siembra_${(document.getElementById('cropName').value||'cultivo').replace(/\s/g,'_')}.xlsx`);
+  showToast('✓ Excel exportado');
+}
+
+// ============================================================
+//  EXPORT PDF
+// ============================================================
+function exportPDF() {
+  if (!puntos.length) { showToast('⚠ Calcule primero'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+  const cropName = document.getElementById('cropName').value || 'Cultivo';
+  const { dp, dc, rumbo, beta, nS, nP, x0, y0 } = params;
+
+  // === Portada / cabecera ===
+  doc.setFillColor(13, 17, 23);
+  doc.rect(0, 0, 297, 210, 'F');
+
+  doc.setFillColor(22, 27, 34);
+  doc.rect(0, 0, 297, 24, 'F');
+
+  doc.setTextColor(63, 185, 80);
+  doc.setFontSize(16);
+  doc.setFont('courier', 'bold');
+  doc.text('AGRO UTM', 12, 15);
+
+  doc.setTextColor(139, 148, 158);
+  doc.setFontSize(10);
+  doc.setFont('courier', 'normal');
+  doc.text('Reporte de Modelado de Siembra', 55, 15);
+
+  doc.setTextColor(88, 166, 255);
+  doc.text(cropName.toUpperCase(), 220, 15);
+
+  doc.setTextColor(48, 54, 61);
+  doc.text(new Date().toLocaleDateString('es-CO', {year:'numeric',month:'long',day:'numeric'}), 230, 9);
+
+  // === Parámetros ===
+  const pY = 32;
+  doc.setFontSize(7);
+  doc.setFont('courier', 'bold');
+  doc.setTextColor(139, 148, 158);
+  doc.text('PARÁMETROS DE SIEMBRA', 12, pY);
+
+  doc.setFillColor(28, 34, 48);
+  doc.rect(12, pY + 2, 273, 28, 'F');
+
+  const paramData = [
+    [`Dp = ${dp} m`, `Dc = ${dc} m`, `Rumbo α = ${rumbo}°`, `Beta β = ${beta}°`],
+    [`Surcos = ${nS+1}`, `Plantas/surco = ${nP}`, `Total = ${puntos.length}`, `X₀ = ${x0}  Y₀ = ${y0}`],
+  ];
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(230, 237, 243);
+
+  paramData.forEach((row, ri) => {
+    row.forEach((cell, ci) => {
+      doc.text(cell, 16 + ci * 68, pY + 10 + ri * 10);
+    });
+  });
+
+  // === Tabla ===
+  const head = [['N°', 'Surco', 'Planta', 'X — Este (m)', 'Y — Norte (m)']];
+  const body = puntos.slice(0, 400).map((p, i) => [
+    i + 1, p.surco, p.planta, p.x.toFixed(6), p.y.toFixed(6)
+  ]);
+
+  doc.autoTable({
+    startY: pY + 35,
+    head,
+    body,
+    styles: {
+      font: 'courier',
+      fontSize: 7,
+      textColor: [230, 237, 243],
+      fillColor: [13, 17, 23],
+      lineColor: [45, 58, 74],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [22, 27, 34],
+      textColor: [139, 148, 158],
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: { fillColor: [28, 34, 48] },
+    columnStyles: {
+      0: { cellWidth: 14 },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 18 },
+      3: { cellWidth: 55 },
+      4: { cellWidth: 55 },
+    },
+    margin: { left: 12, right: 12 },
+  });
+
+  if (puntos.length > 400) {
+    const finalY = doc.lastAutoTable.finalY + 4;
+    doc.setFontSize(7);
+    doc.setTextColor(139, 148, 158);
+    doc.text(`* Mostrando 400 de ${puntos.length} plantas. Exporte Excel para ver todos.`, 12, finalY);
+  }
+
+  // Pie de página
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFillColor(22, 27, 34);
+    doc.rect(0, 202, 297, 8, 'F');
+    doc.setFontSize(6);
+    doc.setTextColor(48, 54, 61);
+    doc.text(`AgroUTM · ${cropName} · Pág. ${i}/${pageCount}`, 12, 207);
+    doc.text('Generado con AgroUTM Modelador de Siembra', 200, 207);
+  }
+
+  doc.save(`siembra_${cropName.replace(/\s/g,'_')}.pdf`);
+  showToast('✓ PDF exportado');
+}
+
+// ============================================================
+//  EXPORT KML
+// ============================================================
+function exportKML() {
+  if (!puntos.length) { showToast('⚠ Calcule primero'); return; }
+
+  const zoneStr = document.getElementById('utmZone').value;
+  const hem     = zoneStr.slice(-1);
+  const zoneNum = parseInt(zoneStr.slice(0,-1));
+  const cropName = document.getElementById('cropName').value || 'Cultivo';
+
+  // Definir proyección UTM
+  const projStr = `+proj=utm +zone=${zoneNum} +datum=WGS84 +units=m +no_defs` +
+    (hem === 'S' ? ' +south' : '');
+  proj4.defs('UTMZONE', projStr);
+
+  // Convertir puntos
+  const pts = puntos.map(p => {
+    const [lon, lat] = proj4('UTMZONE', 'WGS84', [p.x, p.y]);
+    return { ...p, lon, lat };
+  });
+
+  // Colores por surco (KML usa aabbggrr)
+  const nSurcos = Math.max(...puntos.map(p => p.surco)) + 1;
+  const kmlColor = (s) => {
+    const hue = (s / nSurcos) * 300;
+    // Convert hsl to hex RGB (simplified)
+    const h = hue / 360, s2 = 0.7, l = 0.6;
+    let r, g, b;
+    const q = l < 0.5 ? l * (1 + s2) : l + s2 - l * s2;
+    const p2 = 2 * l - q;
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q-p)*6*t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q-p)*(2/3-t)*6;
+      return p;
+    };
+    r = Math.round(hue2rgb(p2, q, h+1/3)*255);
+    g = Math.round(hue2rgb(p2, q, h)*255);
+    b = Math.round(hue2rgb(p2, q, h-1/3)*255);
+    const hex = n => n.toString(16).padStart(2,'0').toUpperCase();
+    return `FF${hex(b)}${hex(g)}${hex(r)}`; // KML: aabbggrr
+  };
+
+  const surcos = [...new Set(pts.map(p => p.surco))].sort((a,b)=>a-b);
+
+  let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>${cropName} — Siembra UTM Zona ${zoneStr}</name>
+  <description>Generado por AgroUTM · ${new Date().toLocaleDateString('es-CO')}</description>
+  <Style id="amarre">
+    <IconStyle><color>FF4664F7</color><scale>1.3</scale>
+      <Icon><href>http://maps.google.com/mapfiles/kml/shapes/star.png</href></Icon>
+    </IconStyle>
+  </Style>
+`;
+
+  // Estilos por surco
+  surcos.forEach(s => {
+    kml += `  <Style id="surco${s}">
+    <IconStyle><color>${kmlColor(s)}</color><scale>0.6</scale>
+      <Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon>
+    </IconStyle>
+    <LineStyle><color>${kmlColor(s)}88</color><width>1.5</width></LineStyle>
+  </Style>\n`;
+  });
+
+  // Punto de amarre
+  const anclaje = pts[0];
+  kml += `  <Placemark>
+    <name>Amarre</name>
+    <description>Coordenada de amarre · X=${params.x0} Y=${params.y0}</description>
+    <styleUrl>#amarre</styleUrl>
+    <Point><coordinates>${anclaje.lon},${anclaje.lat},0</coordinates></Point>
+  </Placemark>\n`;
+
+  // Plantas por surco + líneas
+  surcos.forEach(s => {
+    const sp = pts.filter(p => p.surco === s);
+    kml += `  <Folder><name>Surco ${s}</name>\n`;
+
+    // Línea del surco
+    const coords = sp.map(p => `${p.lon},${p.lat},0`).join('\n            ');
+    kml += `    <Placemark>
+      <name>Línea Surco ${s}</name>
+      <styleUrl>#surco${s}</styleUrl>
+      <LineString><tessellate>1</tessellate>
+        <coordinates>${coords}</coordinates>
+      </LineString>
+    </Placemark>\n`;
+
+    // Puntos
+    sp.forEach(p => {
+      kml += `    <Placemark>
+      <name>S${p.surco}P${p.planta}</name>
+      <description>Surco ${p.surco} · Planta ${p.planta}&#13;X: ${p.x.toFixed(3)}&#13;Y: ${p.y.toFixed(3)}</description>
+      <styleUrl>#surco${s}</styleUrl>
+      <Point><coordinates>${p.lon},${p.lat},0</coordinates></Point>
+    </Placemark>\n`;
+    });
+
+    kml += `  </Folder>\n`;
+  });
+
+  kml += `</Document>\n</kml>`;
+
+  const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `siembra_${cropName.replace(/\s/g,'_')}_${zoneStr}.kml`;
+  a.click();
+  showToast('✓ KML exportado — ábralo en Google Earth');
+}
+
+// ============================================================
+//  EXPORT CHART PNG
+// ============================================================
+function exportChartPNG() {
+  if (!puntos.length) { showToast('⚠ Calcule primero'); return; }
+  redrawChart();
+  const canvas = document.getElementById('plotCanvas');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `grafica_siembra.png`;
+  a.click();
+  showToast('✓ PNG exportado');
+}
+
+// ============================================================
+//  TAB SWITCHING
+// ============================================================
+function setTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'grafica') setTimeout(redrawChart, 50);
+}
+
+// ============================================================
+//  TOAST
+// ============================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// ============================================================
+//  RESIZE
+// ============================================================
+window.addEventListener('resize', () => {
+  if (document.getElementById('panel-grafica').classList.contains('active')) redrawChart();
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+// Init — sin auto-cálculo; esperar ingreso del usuario
+</script>
+</body>
+</html>
